@@ -113,6 +113,8 @@ pack_data = [
     {"name": "Celestial", "value": 2000, "upgrade": 0, "totalvalue": 2000},  # is that a madeline celeste reference????
 ]
 
+PACK_NAMES = [p["name"] for p in pack_data]
+
 prism_names_start = [
     "Alpha",
     "Bravo",
@@ -391,6 +393,13 @@ def get_emoji(name):
     else:
         return "🔳"
 
+async def pack_type_autocomplete(interaction: discord.Interaction, current: str) -> list[discord.app_commands.Choice[str]]:
+    # Your naming convention uses capitalized names for choice labels but lowercase for the value
+    return [
+        discord.app_commands.Choice(name=choice, value=choice.lower()) 
+        for choice in PACK_NAMES 
+        if current.lower() in choice.lower()
+    ][:25]
 
 async def fetch_perms(message: discord.Message | discord.Interaction) -> discord.Permissions:
     # this is mainly for threads where the parent isnt cached
@@ -4891,6 +4900,40 @@ async def cookie(message: discord.Interaction):
     view.add_item(button)
     await message.response.send_message(view=view)
 
+@bot.tree.command(description="(ADMIN) Give packs to a user")
+@discord.app_commands.default_permissions(manage_guild=True)
+@discord.app_commands.rename(person_id="user")
+@discord.app_commands.describe(person_id="who", pack_type="what pack type", amount="how many (negatives to remove)")
+@discord.app_commands.autocomplete(pack_type=pack_type_autocomplete)
+async def givepack(message: discord.Interaction, person_id: discord.User, pack_type: str, amount: Optional[int]):
+    if amount is None:
+        amount = 1
+
+    valid_pack_names_lower = [p['name'].lower() for p in pack_data]
+    if pack_type.lower() not in valid_pack_names_lower:
+        await message.response.send_message("Invalid pack type specified.", ephemeral=True)
+        return
+
+    # ✅ FIXED: only one return value
+    user = await Profile.get_or_create(guild_id=message.guild.id, user_id=person_id.id)
+
+    pack_field = f"pack_{pack_type.lower()}"
+
+    # Initialize field if missing
+    if pack_field not in user.__dict__.get('_Model__values', {}):
+        user[pack_field] = 0
+
+    user[pack_field] += amount
+    await user.save()
+
+    capitalized_pack_name = next(
+        (p['name'] for p in pack_data if p['name'].lower() == pack_type.lower()), pack_type
+    )
+
+    await message.response.send_message(
+        f"Gave {person_id.mention} {amount:,} **{capitalized_pack_name}** packs.",
+        allowed_mentions=discord.AllowedMentions(users=True)
+    )
 
 @bot.tree.command(description="give cats now")
 @discord.app_commands.rename(cat_type="type")

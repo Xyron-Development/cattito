@@ -81,9 +81,21 @@ class Model:
         return self.__values[name]
 
     def __getitem__(self, name: str) -> Any:
-        if name[0] == "_":
+        # Handle integer indexes (asyncpg-like)
+        if isinstance(name, int):
+            # Convert to list-like behavior (support record[0])
+            key = list(self.__values.keys())[name]
+            return self.__values[key]
+
+        # For string-based access
+        if not isinstance(name, str):
+            raise TypeError(f"Invalid key type: {type(name).__name__}")
+
+        if name.startswith("_"):
             return super().__getitem__(name)
+
         return self.__values[name]
+
 
     async def delete(self) -> None:
         table = self.__class__.__name__.lower()
