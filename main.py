@@ -296,7 +296,7 @@ class Colors:
     red = 0xFF0000
 
 # --- ANTI-CHEAT SYSTEM CONSTANTS ---
-WEBHOOK_URL = "https://discord.com/api/webhooks/1424430966432202782/oCXSKsG78WY48PsM8785lKf-vibOQDzXrSUs4WIpAOgrj25GJvI8KND37D2G2SRj0pOi" # Paste the full URL here
+WEBHOOK_URL = "" # Paste the full URL here
 PING_USER_ID = "1075077561454973020"
 
 # Anti-spam configuration
