@@ -43,7 +43,7 @@ import unidecode
 from aiohttp import web
 from discord import ButtonStyle
 from discord.ext import commands
-from discord.ui import ActionRow, Button, LayoutView, Modal, Separator, TextDisplay, TextInput, Thumbnail, View
+from discord.ui import Button, Modal, TextInput, View
 from PIL import Image
 from discord import Embed
 
@@ -4166,8 +4166,10 @@ async def packs(message: discord.Interaction):
         if interaction.user != message.user:
             await do_funny(interaction)
             return
+
         await interaction.response.defer()
         await user.refresh_from_db()
+
         pack_names = [pack["name"] for pack in pack_data]
         total_pack_count = sum(user[f"pack_{pack_id.lower()}"] for pack_id in pack_names)
         if total_pack_count < 1:
@@ -4178,11 +4180,13 @@ async def packs(message: discord.Interaction):
         results_detail = []
         results_percat = {cat: 0 for cat in cattypes}
         total_upgrades = 0
+
         for level, pack in enumerate(pack_names):
             pack_id = f"pack_{pack.lower()}"
             this_packs_count = user[pack_id]
             if this_packs_count < 1:
                 continue
+
             results_header.append(f"{this_packs_count:,}x {get_emoji(pack.lower() + 'pack')}")
             for _ in range(this_packs_count):
                 chosen_type, cat_amount, upgrades, rewards = get_pack_rewards(level, is_single=False)
@@ -4190,17 +4194,25 @@ async def packs(message: discord.Interaction):
                 if not display_cats:
                     results_detail.append(rewards)
                 results_percat[chosen_type] += cat_amount
+
             user[pack_id] = 0
 
         user.packs_opened += total_pack_count
         user.pack_upgrades += total_upgrades
         for cat_type, cat_amount in results_percat.items():
             user[f"cat_{cat_type}"] += cat_amount
+
+        # ✅ Convert 0/1 ints to bool for boolean fields before saving
+        for key, value in user.__dict__['_Model__values'].items():
+            if isinstance(value, int) and value in (0, 1):
+                user.__dict__['_Model__values'][key] = bool(value)
+
         await user.save()
 
         final_header = f"Opened {total_pack_count:,} packs!"
         pack_list = "**" + ", ".join(results_header) + "**"
         final_result = "\n".join(results_detail)
+
         if display_cats or len(final_result) > 4000 - len(pack_list):
             half_result = []
             for cat in cattypes:
@@ -4212,12 +4224,21 @@ async def packs(message: discord.Interaction):
         embed = discord.Embed(title=final_header, description=pack_list, color=Colors.brown)
         await interaction.edit_original_response(embed=embed, view=None)
         await asyncio.sleep(1)
+
         embed = discord.Embed(title=final_header, description=pack_list + "\n\n" + final_result, color=Colors.brown)
         await interaction.edit_original_response(embed=embed)
         await asyncio.sleep(1)
+
         await interaction.edit_original_response(view=gen_view(user))
 
-    description = "Each pack starts at one of eight tiers of increasing value - Wooden, Stone, Bronze, Silver, Gold, Platinum, Diamond, or Celestial - and can repeatedly move up tiers with a 30% chance per upgrade. This means that even a pack starting at Wooden, through successive upgrades, can reach the Celestial tier.\n[Chance Info](<https://catbot.minkos.lol/packs>)\n\nClick the buttons below to start opening packs!"
+
+    description = (
+        "Each pack starts at one of eight tiers of increasing value - Wooden, Stone, Bronze, Silver, "
+        "Gold, Platinum, Diamond, or Celestial - and can repeatedly move up tiers with a 30% chance "
+        "per upgrade. This means that even a pack starting at Wooden, through successive upgrades, can "
+        "reach the Celestial tier.\n[Chance Info](<https://catbot.minkos.lol/packs>)\n\nClick the buttons "
+        "below to start opening packs!"
+    )
     embed = discord.Embed(title=f"{get_emoji('bronzepack')} Packs", description=description, color=Colors.brown)
     user = await Profile.get_or_create(guild_id=message.guild.id, user_id=message.user.id)
     await message.response.send_message(embed=embed, view=gen_view(user))
